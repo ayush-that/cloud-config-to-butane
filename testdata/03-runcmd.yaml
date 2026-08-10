@@ -1,0 +1,5 @@
+#cloud-config
+runcmd:
+  - [ systemctl, restart, docker ]
+  - [ sh, -c, "echo 'it worked' > /run/marker" ]
+  - mkdir -p /opt/data && chown core:core /opt/data

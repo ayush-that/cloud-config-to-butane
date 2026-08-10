@@ -1,0 +1,40 @@
+variant: flatcar
+version: 1.1.0
+storage:
+  files:
+    # from runcmd
+    - path: /etc/cc2butane/runcmd.sh
+      mode: 0755
+      contents:
+        inline: |
+          #!/bin/sh
+          set -e
+          'systemctl' 'restart' 'docker'
+          'sh' '-c' 'echo '\''it worked'\'' > /run/marker'
+          mkdir -p /opt/data && chown core:core /opt/data
+          rm -f /etc/cc2butane/runcmd.guard
+    # from runcmd
+    - path: /etc/cc2butane/runcmd.guard
+      mode: 0644
+      contents:
+        inline: |
+          # cc2butane runcmd guard; the unit runs while this exists
+systemd:
+  units:
+    # from runcmd
+    - name: cc2butane-runcmd.service
+      enabled: true
+      contents: |
+        [Unit]
+        Description=cc2butane runcmd (from cloud-config runcmd)
+        ConditionPathExists=/etc/cc2butane/runcmd.guard
+        After=network-online.target
+        Wants=network-online.target
+
+        [Service]
+        Type=oneshot
+        RemainAfterExit=yes
+        ExecStart=/etc/cc2butane/runcmd.sh
+
+        [Install]
+        WantedBy=multi-user.target
