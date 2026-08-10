@@ -116,6 +116,75 @@ func decodePermissions(v any) (mode int, has bool, err error) {
 	}
 }
 
+func mapUsers(v any, doc *document) error {
+	items, ok := v.([]any)
+	if !ok {
+		return fmt.Errorf("users must be a list, got %T", v)
+	}
+	for i, raw := range items {
+		switch u := raw.(type) {
+		case string:
+			if u == "default" {
+				continue // the distro default user has no Ignition equivalent
+			}
+			doc.users = append(doc.users, user{name: u, headComment: "from users"})
+		case map[string]any:
+			name, _ := toString(u["name"])
+			if name == "" {
+				return fmt.Errorf("users[%d] is missing a name", i)
+			}
+			usr := user{name: name, headComment: "from users"}
+			usr.groups = toStringList(u["groups"])
+			usr.sshKeys = toStringList(firstPresent(u, "ssh_authorized_keys", "ssh-authorized-keys"))
+			usr.shell, _ = toString(u["shell"])
+			usr.primaryGroup, _ = toString(u["primary_group"])
+			usr.passwordHash, _ = toString(firstPresent(u, "passwd", "hashed_passwd"))
+			if sudo := u["sudo"]; sudo != nil && sudo != false {
+				usr.groups = append(usr.groups, "sudo")
+				usr.lineComment = "sudo mapped to 'sudo' group; exact sudoers rule not represented"
+			}
+			usr.groups = dedupe(usr.groups) // Ignition rejects duplicate group entries
+			doc.users = append(doc.users, usr)
+		default:
+			return fmt.Errorf("users[%d] must be a string or mapping, got %T", i, raw)
+		}
+	}
+	return nil
+}
+
+// mapGroups turns groups into passwd.groups entries; Ignition groups carry no membership, so members are dropped with a flag.
+func mapGroups(v any, doc *document) error {
+	add := func(name string, hasMembers bool) {
+		g := group{name: name, headComment: "from groups"}
+		if hasMembers {
+			g.lineComment = "group members not representable in Ignition; set them via user.groups"
+		}
+		doc.groups = append(doc.groups, g)
+	}
+	switch g := v.(type) {
+	case []any:
+		for i, raw := range g {
+			switch item := raw.(type) {
+			case string:
+				add(item, false)
+			case map[string]any:
+				for name, members := range item {
+					add(name, len(toStringList(members)) > 0)
+				}
+			default:
+				return fmt.Errorf("groups[%d] must be a string or mapping, got %T", i, raw)
+			}
+		}
+	case map[string]any:
+		for name, members := range g {
+			add(name, len(toStringList(members)) > 0)
+		}
+	default:
+		return fmt.Errorf("groups must be a list or mapping, got %T", v)
+	}
+	return nil
+}
+
 // toString coerces a scalar YAML value to a string; maps, lists and nil are not scalars and return false.
 func toString(v any) (string, bool) {
 	switch s := v.(type) {
@@ -155,4 +224,26 @@ func toStringList(v any) []string {
 		}
 		return nil
 	}
+}
+
+// dedupe returns the input with later duplicates removed, preserving order.
+func dedupe(in []string) []string {
+	seen := make(map[string]bool, len(in))
+	out := in[:0]
+	for _, s := range in {
+		if !seen[s] {
+			seen[s] = true
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
+func firstPresent(m map[string]any, keys ...string) any {
+	for _, k := range keys {
+		if v, ok := m[k]; ok {
+			return v
+		}
+	}
+	return nil
 }
