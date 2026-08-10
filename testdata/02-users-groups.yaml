@@ -1,0 +1,20 @@
+#cloud-config
+groups:
+  - engineering
+  - admins:
+      - alice
+
+users:
+  - name: alice
+    primary_group: engineering
+    groups:
+      - docker
+      - sudo
+    shell: /bin/bash
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    ssh_authorized_keys:
+      - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExampleKeyAlice alice@example
+  - name: bob
+    shell: /usr/bin/fish
+    ssh-authorized-keys:
+      - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExampleKeyBob bob@example

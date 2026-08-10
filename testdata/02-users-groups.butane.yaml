@@ -1,0 +1,23 @@
+variant: flatcar
+version: 1.1.0
+passwd:
+  groups:
+    # from groups
+    - name: engineering
+    # from groups
+    - name: admins # group members not representable in Ignition; set them via user.groups
+  users:
+    # from users
+    - name: alice # sudo mapped to 'sudo' group; exact sudoers rule not represented
+      primary_group: engineering
+      groups:
+        - docker
+        - sudo
+      shell: /bin/bash
+      ssh_authorized_keys:
+        - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExampleKeyAlice alice@example
+    # from users
+    - name: bob
+      shell: /usr/bin/fish
+      ssh_authorized_keys:
+        - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExampleKeyBob bob@example
