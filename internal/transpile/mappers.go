@@ -185,6 +185,142 @@ func mapGroups(v any, doc *document) error {
 	return nil
 }
 
+// mapCACerts writes each trusted cert to /etc/ssl/certs and adds a oneshot unit running update-ca-certificates.
+func mapCACerts(v any, doc *document) error {
+	m, ok := v.(map[string]any)
+	if !ok {
+		return fmt.Errorf("ca_certs must be a mapping, got %T", v)
+	}
+	certs := toStringList(firstPresent(m, "trusted", "trusted_ca"))
+	if len(certs) == 0 {
+		return nil
+	}
+	for i, cert := range certs {
+		cert = strings.TrimSpace(cert) + "\n"
+		doc.files = append(doc.files, file{
+			path:        fmt.Sprintf("/etc/ssl/certs/cloud-init-ca-cert-%d.pem", i+1),
+			mode:        0o644,
+			hasMode:     true,
+			inline:      cert,
+			headComment: "from ca_certs",
+		})
+	}
+	doc.units = append(doc.units, unit{
+		name:        "cc2butane-update-ca-certificates.service",
+		enabled:     true,
+		headComment: "from ca_certs",
+		contents: joinUnit(
+			"[Unit]",
+			"Description=Update CA certificates (cc2butane, from cloud-config ca_certs)",
+			"After=network-online.target",
+			"",
+			"[Service]",
+			"Type=oneshot",
+			"RemainAfterExit=yes",
+			"ExecStart=/usr/sbin/update-ca-certificates",
+			"",
+			"[Install]",
+			"WantedBy=multi-user.target",
+		),
+	})
+	return nil
+}
+
+// mapCommands turns runcmd/bootcmd into a shell script plus a guarded oneshot unit; the script deletes the guard on success so it runs once across reboots.
+func mapCommands(key string, v any, doc *document, opts Options) error {
+	cmds, ok := v.([]any)
+	if !ok {
+		return fmt.Errorf("%s must be a list, got %T", key, v)
+	}
+	if len(cmds) == 0 {
+		return nil
+	}
+	if opts.Strict {
+		return &UnsupportedError{Key: key, Detail: "arbitrary commands are disabled under --strict"}
+	}
+
+	body, err := shellifyBody(cmds)
+	if err != nil {
+		return fmt.Errorf("%s: %w", key, err)
+	}
+	base := "/etc/cc2butane/" + key
+	script := base + ".sh"
+	guard := base + ".guard"
+
+	doc.files = append(doc.files,
+		file{
+			path:        script,
+			mode:        0o755,
+			hasMode:     true,
+			inline:      "#!/bin/sh\nset -e\n" + body + "rm -f " + guard + "\n",
+			headComment: "from " + key,
+		},
+		file{
+			path:        guard,
+			mode:        0o644,
+			hasMode:     true,
+			inline:      "# cc2butane " + key + " guard; the unit runs while this exists\n",
+			headComment: "from " + key,
+		},
+	)
+
+	u := unit{
+		name:        "cc2butane-" + key + ".service",
+		enabled:     true,
+		headComment: "from " + key,
+		contents: joinUnit(
+			"[Unit]",
+			"Description=cc2butane "+key+" (from cloud-config "+key+")",
+			"ConditionPathExists="+guard,
+			"After=network-online.target",
+			"Wants=network-online.target",
+			"",
+			"[Service]",
+			"Type=oneshot",
+			"RemainAfterExit=yes",
+			"ExecStart="+script,
+			"",
+			"[Install]",
+			"WantedBy=multi-user.target",
+		),
+	}
+	if key == "bootcmd" {
+		u.lineComment = "bootcmd runs every boot in cloud-init; Ignition provisions once, so this runs once"
+	}
+	doc.units = append(doc.units, u)
+	return nil
+}
+
+// shellifyBody reimplements cloud-init's shellify: a list item becomes single-quoted argv, a string item is emitted raw.
+func shellifyBody(cmds []any) (string, error) {
+	var b strings.Builder
+	for i, c := range cmds {
+		switch v := c.(type) {
+		case string:
+			b.WriteString(v)
+			b.WriteByte('\n')
+		case []any:
+			parts := make([]string, len(v))
+			for j, arg := range v {
+				s, ok := toString(arg)
+				if !ok {
+					return "", fmt.Errorf("command %d argument %d is not a scalar", i, j)
+				}
+				parts[j] = "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
+			}
+			b.WriteString(strings.Join(parts, " "))
+			b.WriteByte('\n')
+		default:
+			return "", fmt.Errorf("command %d must be a string or a list, got %T", i, c)
+		}
+	}
+	return b.String(), nil
+}
+
+func joinUnit(lines ...string) string {
+	return strings.Join(lines, "\n") + "\n"
+}
+
 // toString coerces a scalar YAML value to a string; maps, lists and nil are not scalars and return false.
 func toString(v any) (string, bool) {
 	switch s := v.(type) {
