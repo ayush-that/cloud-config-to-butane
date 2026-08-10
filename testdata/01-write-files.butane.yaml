@@ -1,0 +1,21 @@
+variant: flatcar
+version: 1.1.0
+storage:
+  files:
+    # from write_files
+    - path: /etc/motd.d/greeting.conf
+      mode: 0644
+      contents:
+        inline: |
+          Welcome to a Flatcar node provisioned from cloud-config.
+    # from write_files
+    - path: /etc/app/from-base64.txt
+      mode: 0644
+      contents:
+        inline: managed by cloud-init, stored as base64
+    # from write_files
+    - path: /etc/app/secret.env
+      mode: 0600
+      contents:
+        inline: |
+          TOKEN=do-not-share

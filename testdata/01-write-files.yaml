@@ -1,0 +1,14 @@
+#cloud-config
+write_files:
+  - path: /etc/motd.d/greeting.conf
+    content: |
+      Welcome to a Flatcar node provisioned from cloud-config.
+    permissions: '0644'
+  - path: /etc/app/from-base64.txt
+    encoding: b64
+    content: bWFuYWdlZCBieSBjbG91ZC1pbml0LCBzdG9yZWQgYXMgYmFzZTY0
+    permissions: '0644'
+  - path: /etc/app/secret.env
+    content: |
+      TOKEN=do-not-share
+    permissions: '0600'
