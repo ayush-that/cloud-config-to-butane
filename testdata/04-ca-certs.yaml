@@ -1,0 +1,8 @@
+#cloud-config
+ca_certs:
+  trusted:
+    - |
+      -----BEGIN CERTIFICATE-----
+      MIIBExampleInlineCertificateBodyForCloudConfigToButaneProofOfConcept
+      AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+      -----END CERTIFICATE-----

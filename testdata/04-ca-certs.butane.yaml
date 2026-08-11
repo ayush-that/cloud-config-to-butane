@@ -1,0 +1,30 @@
+variant: flatcar
+version: 1.1.0
+storage:
+  files:
+    # from ca_certs
+    - path: /etc/ssl/certs/cloud-init-ca-cert-1.pem
+      mode: 0644
+      contents:
+        inline: |
+          -----BEGIN CERTIFICATE-----
+          MIIBExampleInlineCertificateBodyForCloudConfigToButaneProofOfConcept
+          AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+          -----END CERTIFICATE-----
+systemd:
+  units:
+    # from ca_certs
+    - name: cc2butane-update-ca-certificates.service
+      enabled: true
+      contents: |
+        [Unit]
+        Description=Update CA certificates (cc2butane, from cloud-config ca_certs)
+        After=network-online.target
+
+        [Service]
+        Type=oneshot
+        RemainAfterExit=yes
+        ExecStart=/usr/sbin/update-ca-certificates
+
+        [Install]
+        WantedBy=multi-user.target
