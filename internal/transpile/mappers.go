@@ -54,13 +54,14 @@ func mapWriteFiles(v any, doc *document) error {
 	return nil
 }
 
-
+// decodeContent reverses cloud-init's write_files encodings: base64 is decoded before gzip, matching cloud-init's order.
 func decodeContent(content, encoding string) ([]byte, error) {
 	raw := []byte(content)
 	hasB64, hasGz := false, false
 	for _, tok := range strings.Split(strings.ToLower(strings.TrimSpace(encoding)), "+") {
 		switch strings.TrimSpace(tok) {
 		case "", "text/plain":
+			// plain, no transform
 		case "b64", "base64":
 			hasB64 = true
 		case "gz", "gzip":
@@ -70,7 +71,14 @@ func decodeContent(content, encoding string) ([]byte, error) {
 		}
 	}
 	if hasB64 {
-		dec, err := base64.StdEncoding.DecodeString(strings.TrimSpace(content))
+		// Real cloud-configs often wrap base64 across lines; drop all whitespace.
+		clean := strings.Map(func(r rune) rune {
+			if r == ' ' || r == '\t' || r == '\n' || r == '\r' {
+				return -1
+			}
+			return r
+		}, content)
+		dec, err := base64.StdEncoding.DecodeString(clean)
 		if err != nil {
 			return nil, fmt.Errorf("base64 decode: %w", err)
 		}
