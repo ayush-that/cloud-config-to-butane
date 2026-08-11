@@ -1,0 +1,61 @@
+variant: flatcar
+version: 1.1.0
+storage:
+  files:
+    # from write_files
+    - path: /run/kubeadm/kubeadm-join-config.yaml
+      mode: 0640
+      contents:
+        inline: |
+          apiVersion: kubeadm.k8s.io/v1beta3
+          kind: JoinConfiguration
+          discovery:
+            bootstrapToken:
+              apiServerEndpoint: 10.0.0.1:6443
+              token: abcdef.0123456789abcdef
+              caCertHashes:
+                - sha256:1234567890abcdef
+          nodeRegistration:
+            kubeletExtraArgs:
+              cloud-provider: external
+    # from write_files
+    - path: /run/cluster-api/placeholder
+      mode: 0644
+      contents:
+        inline: |
+          This placeholder keeps /run/cluster-api present before bootstrap.
+    # from runcmd
+    - path: /etc/cc2butane/runcmd.sh
+      mode: 0755
+      contents:
+        inline: |
+          #!/bin/sh
+          set -e
+          kubeadm join --config /run/kubeadm/kubeadm-join-config.yaml
+          mkdir -p /run/cluster-api && echo success > /run/cluster-api/bootstrap-success.complete
+          rm -f /etc/cc2butane/runcmd.guard
+    # from runcmd
+    - path: /etc/cc2butane/runcmd.guard
+      mode: 0644
+      contents:
+        inline: |
+          # cc2butane runcmd guard; the unit runs while this exists
+systemd:
+  units:
+    # from runcmd
+    - name: cc2butane-runcmd.service
+      enabled: true
+      contents: |
+        [Unit]
+        Description=cc2butane runcmd (from cloud-config runcmd)
+        ConditionPathExists=/etc/cc2butane/runcmd.guard
+        After=network-online.target
+        Wants=network-online.target
+
+        [Service]
+        Type=oneshot
+        RemainAfterExit=yes
+        ExecStart=/etc/cc2butane/runcmd.sh
+
+        [Install]
+        WantedBy=multi-user.target

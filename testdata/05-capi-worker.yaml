@@ -1,0 +1,14 @@
+#cloud-config
+write_files:
+  - path: /run/kubeadm/kubeadm-join-config.yaml
+    encoding: base64
+    permissions: '0640'
+    content: YXBpVmVyc2lvbjoga3ViZWFkbS5rOHMuaW8vdjFiZXRhMwpraW5kOiBKb2luQ29uZmlndXJhdGlvbgpkaXNjb3Zlcnk6CiAgYm9vdHN0cmFwVG9rZW46CiAgICBhcGlTZXJ2ZXJFbmRwb2ludDogMTAuMC4wLjE6NjQ0MwogICAgdG9rZW46IGFiY2RlZi4wMTIzNDU2Nzg5YWJjZGVmCiAgICBjYUNlcnRIYXNoZXM6CiAgICAgIC0gc2hhMjU2OjEyMzQ1Njc4OTBhYmNkZWYKbm9kZVJlZ2lzdHJhdGlvbjoKICBrdWJlbGV0RXh0cmFBcmdzOgogICAgY2xvdWQtcHJvdmlkZXI6IGV4dGVybmFsCg==
+  - path: /run/cluster-api/placeholder
+    permissions: '0644'
+    content: |
+      This placeholder keeps /run/cluster-api present before bootstrap.
+
+runcmd:
+  - kubeadm join --config /run/kubeadm/kubeadm-join-config.yaml
+  - mkdir -p /run/cluster-api && echo success > /run/cluster-api/bootstrap-success.complete
