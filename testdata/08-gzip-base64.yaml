@@ -1,0 +1,6 @@
+#cloud-config
+write_files:
+  - path: /etc/sysctl.d/99-tuning.conf
+    encoding: gzip+base64
+    content: H4sIADMihGoAA8tOLcpLzdEryEyJz02sULBVMDG0NDE2MOEqy9UDCgAFC+KT80vzSoBSRmZGhiYmXADwog4LMwAAAA==
+    permissions: '0644'
