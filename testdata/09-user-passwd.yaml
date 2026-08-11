@@ -1,0 +1,9 @@
+#cloud-config
+users:
+  - name: operator
+    passwd: $6$cc2butanesalt$7N85EoGlGFt3f6/oW80khl9nvb/CXh0kFd5HdV2YPVRMjV8DhEliHDV6CuLCgICzLlesYpJwYVGImSEYDhq4k0
+    groups:
+      - sudo
+    shell: /bin/bash
+    ssh_authorized_keys:
+      - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExampleKeyOperator operator@example
